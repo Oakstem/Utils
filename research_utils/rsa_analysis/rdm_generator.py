@@ -7,6 +7,8 @@ import pingouin as pg
 from matplotlib import pyplot as plt
 from scipy.stats import pearsonr
 from scipy.spatial.distance import cosine
+from tqdm import tqdm
+
 
 def pearson(vec1, vec2):
     res = pearsonr(vec1, vec2)
@@ -26,18 +28,22 @@ def cosine_similarity(vector1, vector2):
 def create_and_save_rdm(embeddings, labels, measure_func, dest_path):
     rdm = np.zeros((len(embeddings), len(embeddings)))
     filenames = list(embeddings.keys())
-    for i, first_em in enumerate(embeddings.values()):
+    progr = tqdm(enumerate(embeddings.values()))
+    for i, first_em in progr:
+        progr.set_description(f'Calculating RDM matrix {i}/{len(embeddings.values())}')
         for j, second_em in enumerate(embeddings.values()):
-            try:
-                rdm[i, j] = measure_func(first_em, second_em)
-            except:
-                stop = 1
+            rdm[i, j] = measure_func(first_em, second_em)
 
     n = len(labels)
     rdm_df = pd.DataFrame(data=rdm, columns=filenames, index=filenames)
     rdm_df.to_csv(dest_path)
 
     print(f"rdm saved successfuly at {dest_path}")
+
+def flatten_if_needed(np_arr: np.ndarray):
+    if len(np_arr.shape) > 1:
+        np_arr = np_arr.flatten()
+    return np_arr
 
 def load_embeddings_in_dir(path, relevant_filenames):
     files = glob.glob(path + '/*.npy')
@@ -49,7 +55,7 @@ def load_embeddings_in_dir(path, relevant_filenames):
         try:
             embd = np.load(file)
             filename = Path(file).name
-            embd_arr[filename] = embd
+            embd_arr[filename] = flatten_if_needed(embd)
         except:
             print(f'Couldnt load file:{file}')
     return embd_arr
@@ -153,12 +159,13 @@ if __name__ == '__main__':
     social = False
     action_class_group = False
     # label_type = 'social' if social else 'normal'
-    modality = 'visual'
+    modality = 'encoder_out'
     # embedding_dir = get_embd_dirname(social)
     embedding_dir = 'combined_mask_at_start_embeddings'
-    main_dir_path = '/Users/alonz/PycharmProjects/merlot_reserve/demo'
-    embd_dir = f'/Users/alonz/PycharmProjects/merlot_reserve/demo/embeddings/{embedding_dir}/' + modality
-    annot_path = '/Users/alonz/PycharmProjects/merlot_reserve/demo/combined_annotations.csv'
+    main_dir_path = '/home/gentex/PycharmProjects/torch/data/vjepa'
+    # embd_dir = f'/Users/alonz/PycharmProjects/merlot_reserve/demo/embeddings/{embedding_dir}/' + modality
+    embd_dir = f'/home/gentex/PycharmProjects/torch/data/vjepa/embedding_analysis/embeddings/' + modality
+    annot_path = '/home/gentex/PycharmProjects/torch/data/combined_annotations.csv'
 
     annot_df = pd.read_csv(annot_path)
 

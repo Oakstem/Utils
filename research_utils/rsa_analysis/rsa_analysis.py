@@ -12,7 +12,7 @@ def create_rsa_from_two_rdms(path_to_first_rdm, path_to_second_rdm
     rdm1 = pd.read_csv(path_to_first_rdm, index_col=0).values
     rdm2 = pd.read_csv(path_to_second_rdm, index_col=0).values
     n = rdm1.shape[0]
-    indices = np.triu_indices(n, k=-1)  # Exclude main diagonal
+    indices = np.triu_indices(n, k=1)  # Exclude main diagonal
     lower_triangle_first_rdm = rdm1[indices]
     lower_triangle_second_rdm = rdm2[indices]
 
@@ -74,7 +74,7 @@ def plot_rdm(rsa_path):
 
 if __name__ == '__main__':
     use_paths_dd = True
-    rdm_path = '/Users/alonz/PycharmProjects/merlot_reserve/demo/RDM/single_modality_audio/'
+    results_path = '/home/gentex/PycharmProjects/torch/data/vjepa/'
 
     paths_dd = {'comb_audio': '/Users/alonz/PycharmProjects/merlot_reserve/demo/RDM/combined_mask_at_start_embeddings/audio_combined_RDM_cosine.csv',
                 'comb_video': '/Users/alonz/PycharmProjects/merlot_reserve/demo/RDM/combined_mask_at_start_embeddings/visual_combined_RDM_cosine.csv',
@@ -83,22 +83,24 @@ if __name__ == '__main__':
                 'single_video': '/Users/alonz/PycharmProjects/merlot_reserve/demo/RDM/single_modality_vis_masked_text/visual_combined_RDM_cosine.csv',
                 'single_video_joint': '/Users/alonz/PycharmProjects/merlot_reserve/demo/RDM/single_modality_vis_masked_text/combined_combined_RDM_cosine.csv',
                 'single_audio': '/Users/alonz/PycharmProjects/merlot_reserve/demo/RDM/single_modality_audio/audio_combined_RDM_cosine.csv',
-                'single_audio_joint': '/Users/alonz/PycharmProjects/merlot_reserve/demo/RDM/single_modality_audio/combined_combined_RDM_cosine.csv'}
+                'single_audio_joint': '/Users/alonz/PycharmProjects/merlot_reserve/demo/RDM/single_modality_audio/combined_combined_RDM_cosine.csv',
+                'encoder_out': '/home/gentex/PycharmProjects/torch/data/vjepa/RDM/embeddings/encoder_out/all_inner_cosine_similarity.csv',
+                'attentive_pool_out': '/home/gentex/PycharmProjects/torch/data/vjepa/RDM/embeddings/attentinve_pooler_out/all_inner_cosine_similarity.csv'}
 
 
-    results_dir = Path(rdm_path) / 'RSA'
+    results_dir = Path(results_path) / 'RSA'
     results_dir.mkdir(parents=True, exist_ok=True)
     full_corr_res_path = results_dir / 'full_corr.csv'
     partial_corr_res_path = results_dir / 'partial_corr.csv'
-    modalities = ['audio', 'combined']
-    modalities = list(paths_dd.keys())
+    modalities = ['encoder_out', 'attentive_pool_out']
+    # modalities = list(paths_dd.keys())
 
     full_corr_mat = np.zeros((len(modalities), len(modalities)))
     for ind1, mod1 in enumerate(modalities):
         for ind2, mod2 in enumerate(modalities):
             if not use_paths_dd:
-                mod1_path = f'{rdm_path}/{mod1}_combined_RDM_cosine.csv'
-                mod2_path = f'{rdm_path}/{mod2}_combined_RDM_cosine.csv'
+                mod1_path = f'{results_path}/{mod1}_combined_RDM_cosine.csv'
+                mod2_path = f'{results_path}/{mod2}_combined_RDM_cosine.csv'
             else:
                 mod1_path = paths_dd[mod1]
                 mod2_path = paths_dd[mod2]
