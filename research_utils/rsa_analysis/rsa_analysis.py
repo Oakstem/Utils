@@ -1,16 +1,20 @@
+import os
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
 import pingouin as pg
+import psts_db
 
 
 def create_rsa_from_two_rdms(path_to_first_rdm, path_to_second_rdm
                              ,first_rdm_type, second_rdm_type, rsa_type,
                              file_to_save_full_corr_rsa, file_to_save_partial_corr_rsa):
-    rdm1 = pd.read_csv(path_to_first_rdm, index_col=0).values
-    rdm2 = pd.read_csv(path_to_second_rdm, index_col=0).values
+    rdm1 = pd.read_csv(path_to_first_rdm, index_col=0)
+    rdm2 = pd.read_csv(path_to_second_rdm, index_col=0)
+    rdm1, rdm2 = fix_uneven_dataframes(rdm1, rdm2)
+    rdm1, rdm2 = rdm1.values, rdm2.values
     n = rdm1.shape[0]
     indices = np.triu_indices(n, k=1)  # Exclude main diagonal
     lower_triangle_first_rdm = rdm1[indices]
@@ -45,6 +49,16 @@ def create_rsa_from_two_rdms(path_to_first_rdm, path_to_second_rdm
 
     return combined_full_corr_data, combined_partial_corr_data
 
+
+def fix_uneven_dataframes(df1, df2):
+    if df1.shape != df2.shape:
+        if df1.shape[0] < df2.shape[0]:
+            df2 = df2.loc[df1.index, df1.index]
+        else:
+            df1 = df1.loc[df2.index, df2.index]
+    return df1, df2
+
+
 def normalize_df(df):
     min_val = df.min().min()
     max_val = df.max().max()
@@ -72,27 +86,50 @@ def plot_rdm(rsa_path):
     plt.tight_layout()
     plt.show()
 
+def find_all_inner_rdm_files(path, prefix='all_inner_'):
+    paths_dd = {}
+    for root, dirs, files in os.walk(path):
+        for file in files:
+            if prefix in file:
+                p = Path(root)
+                modality = p.name
+                model_setup = p.parent.name
+                model = p.parent.parent.name
+                key_path = '_'.join([model, model_setup, modality])
+                paths_dd[key_path] = p / file
+    return paths_dd
+
 if __name__ == '__main__':
     use_paths_dd = True
-    results_path = '/home/gentex/PycharmProjects/torch/data/vjepa/'
+    db_path = Path(psts_db.__path__[0])
+    project = 'mreserve'
+    model_setup = 'single_modality_vis_masked_text'
+    results_path = db_path / project / model_setup
+    results_path = db_path
 
-    paths_dd = {'comb_audio': '/Users/alonz/PycharmProjects/merlot_reserve/demo/RDM/combined_mask_at_start_embeddings/audio_combined_RDM_cosine.csv',
-                'comb_video': '/Users/alonz/PycharmProjects/merlot_reserve/demo/RDM/combined_mask_at_start_embeddings/visual_combined_RDM_cosine.csv',
-                'comb_joint': '/Users/alonz/PycharmProjects/merlot_reserve/demo/RDM/combined_mask_at_start_embeddings/combined_combined_RDM_cosine.csv',
-                'comb_text': '/Users/alonz/PycharmProjects/merlot_reserve/demo/RDM/combined_mask_at_start_embeddings/text_combined_RDM_cosine.csv',
-                'single_video': '/Users/alonz/PycharmProjects/merlot_reserve/demo/RDM/single_modality_vis_masked_text/visual_combined_RDM_cosine.csv',
-                'single_video_joint': '/Users/alonz/PycharmProjects/merlot_reserve/demo/RDM/single_modality_vis_masked_text/combined_combined_RDM_cosine.csv',
-                'single_audio': '/Users/alonz/PycharmProjects/merlot_reserve/demo/RDM/single_modality_audio/audio_combined_RDM_cosine.csv',
-                'single_audio_joint': '/Users/alonz/PycharmProjects/merlot_reserve/demo/RDM/single_modality_audio/combined_combined_RDM_cosine.csv',
-                'encoder_out': '/home/gentex/PycharmProjects/torch/data/vjepa/RDM/embeddings/encoder_out/all_inner_cosine_similarity.csv',
-                'attentive_pool_out': '/home/gentex/PycharmProjects/torch/data/vjepa/RDM/embeddings/attentinve_pooler_out/all_inner_cosine_similarity.csv'}
 
+    # paths_dd = {#'comb_audio': results_path / 'audio' / 'all_inner_cosine_similarity.csv',
+    #              'comb_video': results_path / 'visual' / 'all_inner_cosine_similarity.csv',
+    #             'comb_joint': results_path / 'combined' / 'all_inner_cosine_similarity.csv'}
+    #             'category_audio': '/Users/alonz/PycharmProjects/pSTS_DB/psts_db/mreserve/combined_mask_at_start_embeddings/audio_combined_RDM_cosine.csv',
+    #             'category_video': '/Users/alonz/PycharmProjects/pSTS_DB/psts_db/mreserve/combined_mask_at_start_embeddings/visual_combined_RDM_cosine.csv',
+    #             'category_combined': '/Users/alonz/PycharmProjects/pSTS_DB/psts_db/mreserve/combined_mask_at_start_embeddings/combined_combined_RDM_cosine.csv',
+    #             'category_text': '/Users/alonz/PycharmProjects/pSTS_DB/psts_db/mreserve/combined_mask_at_start_embeddings/text_combined_RDM_cosine.csv'}
+                # 'comb_text': '/Users/alonz/PycharmProjects/merlot_reserve/demo/RDM/combined_mask_at_start_embeddings/text_combined_RDM_cosine.csv',
+                # 'single_video': '/Users/alonz/PycharmProjects/merlot_reserve/demo/RDM/single_modality_vis_masked_text/visual_combined_RDM_cosine.csv',
+                # 'single_video_joint': '/Users/alonz/PycharmProjects/merlot_reserve/demo/RDM/single_modality_vis_masked_text/combined_combined_RDM_cosine.csv',
+                # 'single_audio': '/Users/alonz/PycharmProjects/merlot_reserve/demo/RDM/single_modality_audio/audio_combined_RDM_cosine.csv',
+                # 'single_audio_joint': '/Users/alonz/PycharmProjects/merlot_reserve/demo/RDM/single_modality_audio/combined_combined_RDM_cosine.csv',
+                # 'encoder_out': '/home/gentex/PycharmProjects/torch/data/vjepa/RDM/embeddings/encoder_out/all_inner_cosine_similarity.csv',
+                # 'attentive_pool_out': '/home/gentex/PycharmProjects/torch/data/vjepa/RDM/embeddings/attentinve_pooler_out/all_inner_cosine_similarity.csv'}
+    paths_dd = find_all_inner_rdm_files(db_path)
 
     results_dir = Path(results_path) / 'RSA'
     results_dir.mkdir(parents=True, exist_ok=True)
     full_corr_res_path = results_dir / 'full_corr.csv'
     partial_corr_res_path = results_dir / 'partial_corr.csv'
-    modalities = ['encoder_out', 'attentive_pool_out']
+    # modalities = ['comb_audio', 'comb_video', 'comb_joint']
+    modalities = list(paths_dd.keys())
     # modalities = list(paths_dd.keys())
 
     full_corr_mat = np.zeros((len(modalities), len(modalities)))
@@ -114,4 +151,5 @@ if __name__ == '__main__':
 
     res_df = pd.DataFrame(data=full_corr_mat, columns=modalities, index=modalities)
     res_df.to_csv(full_corr_res_path)
+    print(f'Results saved at:{full_corr_res_path}')
     pass
