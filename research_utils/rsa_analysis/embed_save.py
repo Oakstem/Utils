@@ -16,9 +16,10 @@ class EmbeddingSave:
         for modal in self.config['modalities']:
             Path(os.path.join(self.results_path, modal)).mkdir(parents=True, exist_ok=True)
 
-    def __call__(self, embd, input_name, modality):
+    def __call__(self, embd, input_name, modality, flatten=True):
         embd_np = np.array(embd)
-        embd_np = embd_np.flatten()
+        if flatten:
+            embd_np = embd_np.flatten()
         save_path = os.path.join(self.results_path, modality, f"{input_name}.npy")
         np.save(save_path, embd_np)
 

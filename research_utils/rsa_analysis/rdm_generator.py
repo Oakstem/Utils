@@ -1,6 +1,6 @@
 import glob
 from pathlib import Path
-
+import os
 import numpy as np
 import pandas as pd
 import pingouin as pg
@@ -25,20 +25,23 @@ def cosine_similarity(vector1, vector2):
     similarity = dot_product / (norm_vector1 * norm_vector2)
     return similarity
 
-def create_and_save_rdm(embeddings, labels, measure_func, dest_path):
+def create_and_save_rdm(embeddings, labels, measure_func, dest_path, similarity=False):
     rdm = np.zeros((len(embeddings), len(embeddings)))
     filenames = list(embeddings.keys())
     progr = tqdm(enumerate(embeddings.values()))
     for i, first_em in progr:
         progr.set_description(f'Calculating RDM matrix {i}/{len(embeddings.values())}')
         for j, second_em in enumerate(embeddings.values()):
-            rdm[i, j] = measure_func(first_em, second_em)
+            if similarity:
+                rdm[i, j] = 1 - measure_func(first_em, second_em)
+            else:
+                rdm[i, j] = measure_func(first_em, second_em)
 
     n = len(labels)
     rdm_df = pd.DataFrame(data=rdm, columns=filenames, index=filenames)
     rdm_df.to_csv(dest_path)
-
     print(f"rdm saved successfuly at {dest_path}")
+    return rdm_df
 
 def flatten_if_needed(np_arr: np.ndarray):
     if len(np_arr.shape) > 1:
@@ -143,12 +146,31 @@ def action_class_loop(annot_df, embd_dir, main_dir_path, measure_func):
             avg_embd[label] = np.array(embd_arr).mean(axis=0)
             # print(f'{label}: sum:{np.array(embd_arr).sum()}')
 
-def filename_group_loop(annot_df, embd_dir, measure_func):
+def load_single_embedding(embd_dir):
+    if not os.path.isfile(embd_dir):
+        files = glob.glob(embd_dir + '/*.npy')
+        embd_arr = {}
+        for file in files:
+            embd = np.load(file, allow_pickle=True).item()
+            embd_arr.update(embd)
+            # filename = Path(file).name
+            # embd_arr[filename] = flatten_if_needed(embd)
+    else:
+        embd_arr = np.load(embd_dir, allow_pickle=True).item()
+
+    # remove nan valued embeddings
+    embd_arr = {key: val for key, val in embd_arr.items() if not np.isnan(val).any()}
+    return embd_arr
+
+def filename_group_loop(annot_df, embd_dir, measure_func, single_file=False):
     label = 'all'
     unq_filenames = annot_df.filename.unique()
     embd_dirname = Path(embd_dir).parent.name
     # for filename in unq_filenames:
-    embd_arr = load_embeddings_in_dir(embd_dir, unq_filenames)
+    if single_file:
+        embd_arr = load_single_embedding(embd_dir)
+    else:
+        embd_arr = load_embeddings_in_dir(embd_dir, unq_filenames)
     results_path = build_results_path(main_dir_path, embd_dirname, label, measure_func)
     create_and_save_rdm(embd_arr, unq_filenames, measure_func, results_path)
     pass
@@ -159,14 +181,14 @@ if __name__ == '__main__':
     social = False
     action_class_group = False
     # label_type = 'social' if social else 'normal'
-    modality = 'encoder_out'
+    modality = 'image'
     # embedding_dir = get_embd_dirname(social)
-    embedding_dir = 'combined_mask_at_start_embeddings'
-    main_dir_path = '/home/gentex/PycharmProjects/torch/data/vjepa'
+    model_name = 'clip_expert-pond-125'
+    main_dir_path = f'/Users/alonz/PycharmProjects/pSTS_DB/psts_db/{model_name}'
     # embd_dir = f'/Users/alonz/PycharmProjects/merlot_reserve/demo/embeddings/{embedding_dir}/' + modality
-    embd_dir = f'/home/gentex/PycharmProjects/torch/data/vjepa/embedding_analysis/embeddings/' + modality
-    annot_path = '/home/gentex/PycharmProjects/torch/data/combined_annotations.csv'
-
+    embd_dir = f'/Users/alonz/PycharmProjects/clip2brain/features/CLIP/20240618_220556_expert-pond-125_pyhlu5d1/final_clip_embd.npy'
+    annot_path = '/Users/alonz/PycharmProjects/merlot_reserve/demo/combined_annotations.csv'
+    single_embedding_file = os.path.isfile(embd_dir)
     annot_df = pd.read_csv(annot_path)
 
     labels, annot_df = get_labels(annot_df, social)
@@ -175,17 +197,16 @@ if __name__ == '__main__':
     measure_func = cosine_similarity
 
     if not action_class_group:
-        filename_group_loop(annot_df, embd_dir, measure_func)
+        filename_group_loop(annot_df, embd_dir, measure_func, single_file=single_embedding_file)
     else:
         action_class_loop(annot_df, embd_dir, main_dir_path, measure_func)
         # Now lets build and RDM between different labels
-        results_path = Path(main_dir_path) / 'RDM' / embedding_dir /f'{modality}_combined_RDM_{measure_func.__name__}.csv'
+        results_path = Path(main_dir_path) / 'RDM' / model_name /f'{modality}_combined_RDM_{measure_func.__name__}.csv'
         embd_arr = list(avg_embd.values())
         label_keys = list(avg_embd.keys())
         embd_arr = robust_scaling(embd_arr, apply_scaling)
         create_and_save_rdm(embd_arr, label_keys, measure_func, results_path)
 
         # label_embds = np.load('/Users/alonz/PycharmProjects/merlot_reserve/demo/0_5seg_embeddings/text/labels.npy')
-
 
         plot_rdm(results_path)
