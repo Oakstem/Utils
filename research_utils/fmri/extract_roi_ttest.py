@@ -21,6 +21,7 @@ class Dataset:
         self._prepare_results_dir()
 
     def _dataset_read(self, fmri_path, labels_path):
+        self.fmri_path = fmri_path
         self.func = nibabel.load(fmri_path)
         self.func_shape = self.func.shape
         # read suited for automatic labels csv file
@@ -36,11 +37,11 @@ class Dataset:
         self.results_dir = Path(__file__).parent / 'results' / dataset_name / self.task_name / self.sub_id
         self.results_dir.mkdir(parents=True, exist_ok=True)
         # clear the directory if not empty
-        for file in self.results_dir.glob('*'):
-            if 'MNI152' in file.name:
-                # skip the MNI152 template file
-                continue
-            file.unlink()
+        # for file in self.results_dir.glob('*'):
+        #     if 'MNI152' in file.name:
+        #         # skip the MNI152 template file
+        #         continue
+        #     file.unlink()
 
 
     def apply_ttest(self, max_th=10.):
@@ -114,7 +115,8 @@ class Dataset:
         plt.show()
 
     def save_results(self):
-        result_path = self.results_dir / f'{self.sub_id}_log_p_values.nii.gz'
+        blur, censor, ica = self.get_fmri_type()
+        result_path = self.results_dir / f'{self.sub_id}_log_p_values_{blur}_{censor}_{ica}.nii.gz'
         self.log_p_values_img.to_filename(result_path)
 
     def dilate(self):
@@ -122,8 +124,14 @@ class Dataset:
         self.roi_mask = binary_dilation(bin_p_values)
         self.roi_mask_img = new_img_like(self.func, self.roi_mask.astype(int))
 
+    def get_fmri_type(self):
+        blur = 'no_blur' if 'no_blur' in self.fmri_path else 'blur'
+        censor = 'no_censor' if 'no_censor' in self.fmri_path else 'censor'
+        ica = 'ica' if 'ica' in self.fmri_path else ''
+        return blur, censor, ica
+
     def create_roi_masks(self, min_voxels_per_roi=20, use_neurosynth=False):
-        labels, _ = sp_label(dataset.roi_mask)
+        labels, _ = sp_label(self.roi_mask)
         unq_labels = np.unique(labels)
         unq_labels = unq_labels[unq_labels > 0]  # remove the background label
         print(f'Found {unq_labels.size} unique regions in the mask')
@@ -132,18 +140,23 @@ class Dataset:
         for unq_label in unq_labels:
             roi_size = np.sum(labels == unq_label)
             if roi_size >= min_voxels_per_roi:
-                single_roi = dataset.roi_mask.copy()
+                single_roi = self.roi_mask.copy()
                 single_roi[labels != unq_label] = 0
-                roi_dd[unq_label] = {'mask': new_img_like(dataset.func, single_roi), 'size': roi_size}
+                roi_dd[unq_label] = {'mask': new_img_like(self.func, single_roi), 'size': roi_size}
 
-                mask_save_path = dataset.results_dir / f'roi_{unq_label}_size_{roi_size}.nii.gz'
+                blur, censor, ica = self.get_fmri_type()
+
+                mask_save_path = (self.results_dir /
+                                  f'roi_{unq_label}_size_{roi_size}_{blur}_{censor}_{ica}.nii.gz')
 
                 if use_neurosynth:
                     # use the neurosynth decoder to find the name of the ROI based on it's database of studies [this takes a while]
                     print(f'ROI:{unq_label}, Searching for ROI name using neurosynth...')
                     results = self.roi_decoder.get_roi_name(roi_dd[unq_label]['mask'], decoder_type='neurosynth-roi')
                     if results['top_name'] is not None:
-                        mask_save_path = dataset.results_dir / f'roi_{unq_label}_size_{roi_size}_name_{results["top_name"]}.nii.gz'
+                        mask_save_path = (self.results_dir /
+                                          f'roi_size_{unq_label}_{roi_size}_name_{results["top_name"]}_'
+                                          f'{roi_size}_{blur}_{censor}_{ica}.nii.gz')
                         print(f'Found ROI:{unq_label} decoded_name:{results["top_name"]}, XYZ:{results["center_coords"]}, size:{roi_size}')
                 else:
                     print(f'Found ROI:{unq_label} size:{roi_size} voxels')
