@@ -18,7 +18,7 @@ class Dataset:
     def __init__(self, fmri_path, labels_path, roi_decoder):
         self.roi_decoder = roi_decoder
         self._dataset_read(fmri_path, labels_path)
-        self._prepare_results_dir()
+        self._prepare_results_dir(fmri_path)
 
     def _dataset_read(self, fmri_path, labels_path):
         self.fmri_path = fmri_path
@@ -31,7 +31,7 @@ class Dataset:
         self.mean_img = image.mean_img(self.func.slicer[..., :limit])
 
 
-    def _prepare_results_dir(self, dataset_name='NND'):
+    def _prepare_results_dir(self, fmri_path, dataset_name='NND'):
         self.sub_id = Path(fmri_path).stem.split('_task')[0]
         self.task_name = Path(fmri_path).stem.split('_task-')[1].split('_')[0]
         self.results_dir = Path(__file__).parent / 'results' / dataset_name / self.task_name / self.sub_id
