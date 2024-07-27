@@ -74,7 +74,7 @@ class LabelCorrelation:
         rdm_results_dir = self.results_path / 'RDM'
         rdm_results_dir.mkdir(parents=True, exist_ok=True)
 
-        # build feature distances RDM matrix
+         # build feature distances RDM matrix
         for feature in self.labels:
             rdm_result_path =rdm_results_dir /  f'{feature}_rdm.csv'
             feature_df = self.combined_annot_df[feature]
@@ -85,11 +85,38 @@ class LabelCorrelation:
         full_results = pd.DataFrame([full_results]).T.sort_values(by=0)
         return full_results
 
+    def rsa_fmri_against_models(self, **kwargs):
+        # Run RSA between fmri & models
+        model_rdms = strip_file_extension(self.model_rdms)
+        fmri_rdms = strip_file_extension(self.fmri_rdms)
+        full_results = {}
+        # full_results = check_rsa_fmri_against_models(fmri_rdms, model_rdms)
+        rsa_results = {}
+        for fmri_name, fmri_rdm in fmri_rdms.items():
+            for strip_val, model_rdm in model_rdms.items():
+                fmri_rdm, model_rdm = fix_uneven_dataframes(fmri_rdm, model_rdm)
+                rsa_corr = create_rsa_from_two_rdm_mats(fmri_rdm, model_rdm, fmri_name, strip_val,
+                                                        'rsa', 'full_corr_rsa.csv',
+                                                        'partial_corr_rsa.csv')
+                rsa_results[f"{fmri_name}/{strip_val}"] = rsa_corr[0]['r'].values[0]
+        full_results = pd.DataFrame([rsa_results]).T.sort_values(by=0)
+        return full_results
+
+    def aggregate_by_roi(self, full_results):
+        new_df = pd.DataFrame()
+        for model in full_results['feature'].unique():
+            model_results = full_results[full_results['feature'] == model]
+            roi_results = model_results[[0, 'roi']].groupby('roi').mean()
+            roi_results['model'] = model
+            new_df = pd.concat([new_df, roi_results])
+        new_df['roi'] = new_df.index.values
+        return new_df
 
     def split_results_by_subject_and_feature(self, full_results):
         full_results['feature'] = [val.split('/')[-1] for val in full_results.index.values]
-        full_results['subject'] = [f"{extract_subject_string(val)}/{extract_roi_string(val)}" for val in
-                                   full_results.index.values]
+        full_results['subject'] = [f"{extract_subject_string(val)}" for val in full_results.index.values]
+        full_results['roi'] = [f"{extract_roi_string(val)}" for val in full_results.index.values]
+
         return full_results
 
     def fix_model_namings(self, full_results, strip_vals=None):
@@ -119,11 +146,27 @@ class LabelCorrelation:
         model_rdms[new_key] = model_rdms.pop(key)
         return model_rdms
 
+    @staticmethod
+    def plot_fmri_vs_models(full_results, title, filename, color='feature', y=0, x='index'):
+        fig = px.bar(full_results, x=x, y=y, color=color, labels={'feature':'Feature'}, title=title,
+                     barmode='group')
+        fig.update_yaxes(title_text='correlation')
+        pyo.iplot(fig)
+        fig.show()
+        pio.write_html(fig, filename)
+        #save the results csv
+        # rename '0' column to 'correlation'
+        full_results = full_results.rename(columns={0: 'correlation'})
+        full_results.to_csv(filename.replace('.html', '.csv'), index=False)
+        print(f'Saved fmri vs model RDMs results to {filename}')
+
 if __name__ == "__main__":
     # create model rdm's vs label(features) correlation plots
     # load data
     config = {'combined_annot_df_path': '/Users/alonz/PycharmProjects/merlot_reserve/demo/combined_annotations.csv',
               'model_db_path': '/Users/alonz/PycharmProjects/pSTS_DB/psts_db',
+              'extract_features_vs_models': False,
+              'extract_fmri_vs_models': True,
               'model_keys_to_rename':
                   {'clip_expert-pond-125_20240618_220556_expert-pond-125_pyhlu5d1_image': 'clip_finetuned_visual'},
               'relevant_models':['mreserve_unimodal_audio_combined',
@@ -139,7 +182,16 @@ if __name__ == "__main__":
 
     label_correlator = LabelCorrelation(config)
     label_correlator.filter_relevant_models(**config)
-    rsa_results = label_correlator.rsa_models_against_labels(**config)
-    rsa_results = label_correlator.split_results_by_subject_and_feature(rsa_results)
-    label_correlator.plot_features_vs_models(rsa_results)
+
+    if config.get('extract_features_vs_models', False):
+        rsa_results = label_correlator.rsa_models_against_labels(**config)
+        labels_vs_model_rsa = label_correlator.split_results_by_subject_and_feature(rsa_results)
+        label_correlator.plot_features_vs_models(labels_vs_model_rsa)
+
+    if config.get('extract_fmri_vs_models', False):
+        fmri_vs_model_rsa = label_correlator.rsa_fmri_against_models(**config)
+        fmri_vs_model_rsa = label_correlator.split_results_by_subject_and_feature(fmri_vs_model_rsa)
+        fmri_vs_model_rsa = label_correlator.aggregate_by_roi(fmri_vs_model_rsa)
+        label_correlator.plot_fmri_vs_models(fmri_vs_model_rsa, 'FMRI vs Models', 'fmri_vs_models.html', x='roi', y=0,
+                            color='model')
     pass

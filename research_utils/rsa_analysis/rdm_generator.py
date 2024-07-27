@@ -185,6 +185,7 @@ if __name__ == '__main__':
     # embedding_dir = get_embd_dirname(social)
     model_name = 'clip_expert-pond-125'
     main_dir_path = f'/Users/alonz/PycharmProjects/pSTS_DB/psts_db/{model_name}'
+    main_dir_path = '/Users/alonz/PycharmProjects/pSTS_DB/psts_db/idans_embeddings/Video/'
     # embd_dir = f'/Users/alonz/PycharmProjects/merlot_reserve/demo/embeddings/{embedding_dir}/' + modality
     embd_dir = f'/Users/alonz/PycharmProjects/clip2brain/features/CLIP/20240618_220556_expert-pond-125_pyhlu5d1/final_clip_embd.npy'
     annot_path = '/Users/alonz/PycharmProjects/merlot_reserve/demo/combined_annotations.csv'
