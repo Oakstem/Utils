@@ -1,25 +1,56 @@
 import os
-import nibabel as nib
 import numpy as np
+import nibabel as nib
+from pprint import pprint
 from nilearn.plotting import plot_roi
 from nilearn.image import resample_to_img
 from nimare.dataset import Dataset
 from nimare.decode import discrete
 from nimare.utils import get_resource_path
 from nilearn.plotting import find_xyz_cut_coords
+from nimare.io import convert_neurosynth_to_dataset
+from nimare.extract import download_abstracts, fetch_neuroquery, fetch_neurosynth
+
 
 class ROIDecoder:
     def __init__(self, dataset_path):
         self._load_dataset(dataset_path)
 
-    def _load_dataset(self, dataset_path):
+    def _load_dataset(self, dataset_path=None):
+        if dataset_path is None:
+            dataset_path = r"./neurosynth/neurosynth_dataset.pkl.gz"
         if not os.path.exists(dataset_path):
-            self.dataset = None
-            print(f'ROIDecoder: ERROR: Dataset file not found: {dataset_path}')
-            print(f'ROI decoder will not work')
-            return
-        self.dataset = Dataset.load(dataset_path)
+            self.dataset = self.download_neurosynth()
+        else:
+            self.dataset = Dataset.load(dataset_path)
 
+    def download_neurosynth(self):
+        out_dir = os.path.abspath("./neurosynth")
+        os.makedirs(out_dir, exist_ok=True)
+
+        files = fetch_neurosynth(
+            data_dir=out_dir,
+            version="7",
+            overwrite=False,
+            source="abstract",
+            vocab="terms",
+        )
+        # Note that the files are saved to a new folder within "out_dir" named "neurosynth".
+        pprint(files)
+        neurosynth_db = files[0]
+
+        ###############################################################################
+        # Convert Neurosynth database to NiMARE dataset file
+        # -----------------------------------------------------------------------------
+        print("\nConverting Neurosynth database to NiMARE format dataset file...")
+        neurosynth_dset = convert_neurosynth_to_dataset(
+            coordinates_file=neurosynth_db["coordinates"],
+            metadata_file=neurosynth_db["metadata"],
+            annotations_files=neurosynth_db["features"],
+        )
+        neurosynth_dset.save(os.path.join(out_dir, "neurosynth_dataset.pkl.gz"))
+        print(neurosynth_dset)
+        return neurosynth_dset
 
     def prepare_roi(self, mask_img):
         self.mask_img = resample_to_img(mask_img, self.dataset.masker.mask_img, interpolation='nearest')
@@ -73,9 +104,9 @@ class ROIDecoder:
 if __name__ == '__main__':
     local_dataset_file = '/Users/alonz/PycharmProjects/pSTS_DB/psts_db/NiMARE/neurosynth_dataset_with_abstracts.pkl.gz'
     mask_img = nib.load(
-        '/Users/alonz/PycharmProjects/Utils/research_utils/fmri/results/NND/500daysofsummer/sub-1/roi_5_size_38.nii.gz')
+        r"E:\NND\ds002837-download\derivatives\sub-1\func\sub-1_task-500daysofsummer_bold_blur_censor_ica.nii.gz")
 
-    roi_decoder = ROIDecoder(local_dataset_file)
+    roi_decoder = ROIDecoder(None)
     results = roi_decoder.get_roi_name(mask_img, decoder_type='neurosynth-roi')
 
     print(f'Top ROI name: {results["top_name"]}')

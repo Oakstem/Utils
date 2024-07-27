@@ -156,12 +156,12 @@ class Dataset:
 
 if __name__ == '__main__':
     cut_coords = [-40, -55, -10]
-    p_values_th = 5
-    min_voxels_per_roi = 30
+    p_values_th = 4
+    min_voxels_per_roi = 40
 
-    fmri_path = '/Users/alonz/PycharmProjects/pSTS_DB/psts_db/datasets/NND/derivatives/sub-1/func/sub-1_task-500daysofsummer_bold_blur_no_censor_ica.nii.gz'
-    labels_path = '/Users/alonz/PycharmProjects/pSTS_DB/psts_db/datasets/NND/stimuli/task-500daysofsummer_face-annotation.1D'
-    neurosynth_dataset = '/Users/alonz/PycharmProjects/pSTS_DB/psts_db/NiMARE/neurosynth_dataset_with_abstracts.pkl.gz'
+    fmri_path = r"E:\NND\ds002837-download\derivatives\sub-1\func\sub-1_task-500daysofsummer_bold_blur_censor.nii.gz"
+    labels_path = r"E:\NND\ds002837-download\stimuli\task-500daysofsummer_face-annotation.1D"
+    neurosynth_dataset = None
 
     roi_decoder = ROIDecoder(neurosynth_dataset)
     # for fmri_path in glob.glob('/Users/alonz/PycharmProjects/pSTS_DB/psts_db/datasets/NND/derivatives/sub*/func/sub*_task-500daysofsummer_bold_blur_censor_ica.nii.gz'):
